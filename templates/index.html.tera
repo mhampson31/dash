@@ -4,4 +4,9 @@
 {% block content %}
     <h1>Hello</h1>
     <p>Index.</p>
+    <ul>Cards</ul>
+    {% for card in cards %}
+      <li>{{card.name}}</li>
+    {% endfor %}
+    </ul>
 {% endblock content %}

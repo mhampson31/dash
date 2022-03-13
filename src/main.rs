@@ -5,13 +5,37 @@ use rocket::serde::Serialize;
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
+struct ServiceCard {
+    name: String,
+    url: String,
+    category: String,
+    active: bool
+}
+
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
 struct TemplateContext<'r> {
-    title: &'r str
+    title: &'r str,
+    cards: Vec<ServiceCard>
 }
 
 #[get("/")]
 fn index() -> Template {
-    let context = TemplateContext {title: "Index"};
+    let mut cards:Vec<ServiceCard> = Vec::new();
+    cards.push(ServiceCard {
+        name: String::from("Foundry"),
+        url: String::from("sigil"),
+        category: String::from("Games"),
+        active: true
+    });
+    cards.push(ServiceCard {
+        name: String::from("Mealie"),
+        url: String::from("kitchen"),
+        category: String::from("Home"),
+        active: true
+    });
+    let context = TemplateContext {title: "Index", cards: cards};
     Template::render("index", context)
 }
 
