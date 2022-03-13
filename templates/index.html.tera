@@ -1,2 +1,7 @@
-<h1>Hello Tera</h1>
-<p>This is a Tera template</p>
+{% extends "base" %}
+{% block title %}Index{% endblock title %}
+
+{% block content %}
+    <h1>Hello</h1>
+    <p>Index.</p>
+{% endblock content %}
