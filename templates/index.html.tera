@@ -2,11 +2,16 @@
 {% block title %}Index{% endblock title %}
 
 {% block content %}
-    <h1>Hello</h1>
-    <p>Index.</p>
+    <h1>Services</h1>
     <ul>Cards</ul>
     {% for service in services %}
-      <li>{{service.name}}</li>
+      <li>
+          <div class="card" style="width: 18rem;">
+            <div class="card-body">
+              <h5 class="card-title">{{service.name}}</h5>
+              <a href="#" class="card-link">{{service.url}}</a>
+            </div>
+          </div></li>
     {% endfor %}
     </ul>
 {% endblock content %}
