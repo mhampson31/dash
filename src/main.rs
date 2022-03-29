@@ -1,46 +1,42 @@
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
 
-use rocket::serde::{Serialize, Deserialize};
-
+use rocket::serde::{Deserialize, Serialize};
 use rocket_dyn_templates::Template;
+use serde_yaml::from_str;
+use std::fs;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
 struct Service {
     name: String,
     url: String,
     category: String,
-    active: bool
+    active: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(crate = "rocket::serde")]
+struct ServiceList {
+    services: Vec<Service>,
 }
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
 struct TemplateContext<'r> {
     title: &'r str,
-    services: Vec<Service>
+    service_list: ServiceList,
 }
 
 #[get("/")]
 fn index() -> Template {
-    let mut services:Vec<Service> = Vec::new();
-    let snames = [
-        ("Foundry", "sigil", "Games", true),
-        ("Mealie", "kitchen", "Home", true),
-        ("Authentik", "id", "Admin", true),
-        ("Bookstack", "wiki", "Home", true)
-    ];
+    let config = fs::read_to_string("dash.yaml").expect("Failed to read input");
+    let services = from_str(&config).unwrap();
 
-    for s in snames {
-        services.push(Service {
-            name: String::from(s.0),
-            url: String::from(s.1),
-            category: String::from(s.2),
-            active: s.3
-            }
-        )
-    }
-
-    let context = TemplateContext {title: "Index", services: services};
+    let context = TemplateContext {
+        title: "Index",
+        service_list: services,
+    };
     Template::render("index", context)
 }
 

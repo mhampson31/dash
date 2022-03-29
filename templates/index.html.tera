@@ -3,15 +3,12 @@
 
 {% block content %}
     <h1>Services</h1>
-    <ul>Cards</ul>
-    {% for service in services %}
-      <li>
-          <div class="card" style="width: 18rem;">
-            <div class="card-body">
-              <h5 class="card-title">{{service.name}}</h5>
-              <a href="#" class="card-link">{{service.url}}</a>
-            </div>
-          </div></li>
+    {% for service in service_list.services %}
+      <div class="card mb-2" style="width: 18rem;">
+        <div class="card-body">
+          <h5 class="card-title"><a href="{{service.url}}" class="card-link">{{service.name}}</a></h5>
+        </div>
+      </div>
     {% endfor %}
     </ul>
 {% endblock content %}

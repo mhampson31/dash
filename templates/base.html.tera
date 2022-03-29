@@ -7,7 +7,7 @@
     <title>{% block title %}{% endblock title %}</title>
     {% endblock head %}
 </head>
-<body>
+<body class="px-2">
     <div id="content">{% block content %}{% endblock content %}</div>
     <div id="footer">
         {% block footer %}
