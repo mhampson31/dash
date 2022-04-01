@@ -66,7 +66,7 @@ fn authentik_login(oauth2: OAuth2<Authentik>, cookies: &CookieJar<'_>) -> Redire
 // The order is important here! If Cookies is positioned before
 // TokenResponse, TokenResponse will be unable to verify the token exchange
 // and return a failure.
-#[get("/auth")]
+#[get("/auth/authentik")]
 fn authentik_callback(token: TokenResponse<Authentik>, cookies: &CookieJar<'_>) -> Redirect {
     // Set a private cookie with the access token
     cookies.add_private(
