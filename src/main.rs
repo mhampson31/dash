@@ -8,11 +8,35 @@ use rocket_dyn_templates::Template;
 use rocket_oauth2::{OAuth2, TokenResponse};
 use serde_yaml::from_str;
 use std::fs;
+use rocket::http::hyper::Request;
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, ACCEPT};
+
 
 // This struct will only be used as a type-level key. Multiple
 // instances of OAuth2 can be used in the same application by
 // using different key types.
 struct Authentik;
+
+//#[derive(serde::Deserialize)]
+struct User {
+//    #[serde(default)]
+    name: String
+}
+
+
+/*
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for User {
+    type Error = std::convert::Infallible;
+
+    async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        request.cookies()
+            .get_private("user_id")
+            .and_then(|c| c.value().parse().ok())
+            .map(|id| User(id))
+            .or_forward(())
+    }
+}*/
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -36,16 +60,40 @@ struct TemplateContext<'r> {
     service_list: ServiceList,
 }
 
+
 #[get("/")]
-fn index() -> Template {
+async fn index(cookies: &CookieJar<'_>) -> Template {
     let config = fs::read_to_string("dash.yaml").expect("Failed to read input");
     let services = from_str(&config).unwrap();
+
+    let request_url = "https://id.flyingseamonsters.com/api/v3/core/users/me/";
+    let token = cookies.get_private("token").unwrap();
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(request_url)
+        .header(AUTHORIZATION, format!("Bearer {}", token))
+        .header(CONTENT_TYPE, "application/json")
+        .header(ACCEPT, "application/json")
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await;
+
+    println!("{:?}", response);
 
     let context = TemplateContext {
         title: "Index",
         service_list: services,
     };
     Template::render("index", context)
+}
+
+
+#[get("/message/<key>")]
+fn message(key: &str, cookies: &CookieJar) -> Option<String> {
+    cookies.get_private(&key).map(|c| format!("Message: {}", c.value()))
 }
 
 // This route calls `get_redirect`, which sets up a token request and
@@ -56,7 +104,7 @@ fn authentik_login(oauth2: OAuth2<Authentik>, cookies: &CookieJar<'_>) -> Redire
     // pre-selected or restricted during application registration. We could
     // use `&[]` instead to not request any scopes, but usually scopes
     // should be requested during registation, in the redirect, or both.
-    oauth2.get_redirect(cookies, &["user:read"]).unwrap()
+    oauth2.get_redirect(cookies, &["user:read", "email", "openid"]).unwrap()
 }
 
 // This route, mounted at the application's Redirect URI, uses the
@@ -74,13 +122,18 @@ fn authentik_callback(token: TokenResponse<Authentik>, cookies: &CookieJar<'_>) 
             .same_site(SameSite::Lax)
             .finish(),
     );
+    cookies.add_private(
+        Cookie::build("type", token.token_type().to_string())
+            .same_site(SameSite::Lax)
+            .finish(),
+    );
     Redirect::to("/")
 }
 
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .mount("/", routes![index, authentik_login, authentik_callback])
+        .mount("/", routes![index, authentik_login, authentik_callback, message])
         .attach(OAuth2::<Authentik>::fairing("authentik"))
         .attach(Template::fairing())
 }
