@@ -8,9 +8,8 @@ use rocket_dyn_templates::Template;
 use rocket_oauth2::{OAuth2, TokenResponse};
 use serde_yaml::from_str;
 use std::fs;
-use rocket::http::hyper::Request;
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, ACCEPT};
-
+//use rocket::http::hyper::Request;
+use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 
 // This struct will only be used as a type-level key. Multiple
 // instances of OAuth2 can be used in the same application by
@@ -19,10 +18,9 @@ struct Authentik;
 
 //#[derive(serde::Deserialize)]
 struct User {
-//    #[serde(default)]
-    name: String
+    //    #[serde(default)]
+    name: String,
 }
-
 
 /*
 #[rocket::async_trait]
@@ -60,28 +58,11 @@ struct TemplateContext<'r> {
     service_list: ServiceList,
 }
 
-
 #[get("/")]
-async fn index(cookies: &CookieJar<'_>) -> Template {
+async fn index(oauth2: OAuth2<Authentik>) -> Template {
+    oauth2.refresh(refresh_token).await.expect("Could not refresh token");
     let config = fs::read_to_string("dash.yaml").expect("Failed to read input");
     let services = from_str(&config).unwrap();
-
-    let request_url = "https://id.flyingseamonsters.com/api/v3/core/users/me/";
-    let token = cookies.get_private("token").unwrap();
-
-    let client = reqwest::Client::new();
-    let response = client
-        .get(request_url)
-        .header(AUTHORIZATION, format!("Bearer {}", token))
-        .header(CONTENT_TYPE, "application/json")
-        .header(ACCEPT, "application/json")
-        .send()
-        .await
-        .unwrap()
-        .text()
-        .await;
-
-    println!("{:?}", response);
 
     let context = TemplateContext {
         title: "Index",
@@ -90,10 +71,17 @@ async fn index(cookies: &CookieJar<'_>) -> Template {
     Template::render("index", context)
 }
 
+#[get("/logout")]
+fn logout(cookies: &CookieJar) -> Redirect {
+    cookies.remove_private(Cookie::named("token"));
+    Redirect::to("/")
+}
 
 #[get("/message/<key>")]
 fn message(key: &str, cookies: &CookieJar) -> Option<String> {
-    cookies.get_private(&key).map(|c| format!("Message: {}", c.value()))
+    cookies
+        .get_private(&key)
+        .map(|c| format!("Message: {}", c.value()))
 }
 
 // This route calls `get_redirect`, which sets up a token request and
@@ -104,7 +92,9 @@ fn authentik_login(oauth2: OAuth2<Authentik>, cookies: &CookieJar<'_>) -> Redire
     // pre-selected or restricted during application registration. We could
     // use `&[]` instead to not request any scopes, but usually scopes
     // should be requested during registation, in the redirect, or both.
-    oauth2.get_redirect(cookies, &["user:read", "email", "openid"]).unwrap()
+    oauth2
+        .get_redirect(cookies, &["user:read", "email", "openid"])
+        .unwrap()
 }
 
 // This route, mounted at the application's Redirect URI, uses the
@@ -115,25 +105,38 @@ fn authentik_login(oauth2: OAuth2<Authentik>, cookies: &CookieJar<'_>) -> Redire
 // TokenResponse, TokenResponse will be unable to verify the token exchange
 // and return a failure.
 #[get("/auth/authentik")]
-fn authentik_callback(token: TokenResponse<Authentik>, cookies: &CookieJar<'_>) -> Redirect {
+async fn authentik_callback(token: TokenResponse<Authentik>, cookies: &CookieJar<'_>) -> Redirect {
     // Set a private cookie with the access token
+    let client = reqwest::Client::new();
+    let request_url = "https://id.flyingseamonsters.com/api/v3/core/users/me/";
+    let response = client
+        .get(request_url)
+        .header(AUTHORIZATION, format!("Bearer {}", &token.access_token()))
+        .header(CONTENT_TYPE, "application/json")
+        .header(ACCEPT, "application/json")
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await;
+    println!("{:?}", response);
+
     cookies.add_private(
         Cookie::build("token", token.access_token().to_string())
             .same_site(SameSite::Lax)
             .finish(),
     );
-    cookies.add_private(
-        Cookie::build("type", token.token_type().to_string())
-            .same_site(SameSite::Lax)
-            .finish(),
-    );
+
     Redirect::to("/")
 }
 
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .mount("/", routes![index, authentik_login, authentik_callback, message])
+        .mount(
+            "/",
+            routes![index, authentik_login, authentik_callback, message, logout],
+        )
         .attach(OAuth2::<Authentik>::fairing("authentik"))
         .attach(Template::fairing())
 }
