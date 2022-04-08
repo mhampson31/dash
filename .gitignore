@@ -12,7 +12,7 @@ Cargo.lock
 .env
 dash.yaml
 Rocket.toml
-
+*/target
 # Added by cargo
 
 /target
