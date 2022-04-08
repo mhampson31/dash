@@ -1,9 +1,9 @@
-{% extends "base" %}
+{% extends "base.html.tera" %}
 {% block title %}Index{% endblock title %}
 
 {% block content %}
     <h1>Services</h1>
-    {% for service in service_list.services %}
+    {% for service in service_list %}
       <div class="card mb-2" style="width: 18rem;">
         <div class="card-body">
           <h5 class="card-title"><a href="{{service.url}}" class="card-link">{{service.name}}</a></h5>

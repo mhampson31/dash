@@ -7,15 +7,19 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0"
 axum = "0.5.1"
+axum-macros = "0.2"
 dotenv = "0.15.0"
 serde = {version = "1.0", features = ["derive"]}
-sqlx = {version = "0.5.11", features = ["runtime-tokio-rustls", "any", "postgres"]}
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tera = "1.0"
+tera = "1"
 sea-orm = { version = "0.7", features = ["sqlx-postgres", "runtime-tokio-native-tls", "macros" ] }
+tower = "0.4.11"
+tower-http = { version = "0.2", features = ["fs"] }
+tower-cookies = { version = "0.4" }
 #oauth2 = "4.1"
 #async-session = "3.0.0"
 # Use Rustls because it makes it easier to cross-compile on CI
