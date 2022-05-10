@@ -3,10 +3,15 @@ extern crate rocket;
 
 use dotenv;
 use reqwest::Url;
-use rocket::http::Header;
+use rocket::fairing::AdHoc;
+use rocket::http::{Cookie, CookieJar, SameSite};
+use rocket::response::Redirect;
 use rocket::routes;
 use rocket::serde::{Deserialize, Serialize};
 use rocket_dyn_templates::Template;
+use rocket_oauth2::{HyperRustlsAdapter, OAuth2, OAuthConfig, StaticProvider, TokenResponse};
+
+struct Authentik;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -43,6 +48,21 @@ fn get_user_applications() -> ServiceList {
     all_apps
 }
 
+#[get("/login/authentik")]
+fn authentik_login(oauth2: OAuth2<Authentik>, mut cookies: &CookieJar<'_>) -> Redirect {
+    oauth2.get_redirect(&mut cookies, &["user:read"]).unwrap()
+}
+
+#[get("/auth/authentik")]
+fn authentik_callback(token: TokenResponse<Authentik>, mut cookies: &CookieJar<'_>) -> Redirect {
+    cookies.add_private(
+        Cookie::build("token", token.access_token().to_string())
+            .same_site(SameSite::Lax)
+            .finish(),
+    );
+    Redirect::to("/")
+}
+
 #[get("/")]
 fn index() -> Template {
     let applications = get_user_applications();
@@ -65,7 +85,7 @@ async fn rocket() -> _ {
 
     //let header = Header::new("Authentication", api_key);
 
-    let client = reqwest::Client::new();
+    /*    let client = reqwest::Client::new();
     let body = client
         .get(user_api)
         .bearer_auth(api_key)
@@ -75,9 +95,32 @@ async fn rocket() -> _ {
         .text()
         .await;
 
-    println!("body = {:?}", body);
+    println!("body = {:?}", body); */
 
     rocket::build()
-        .mount("/", routes![index])
+        .mount("/", routes![index, authentik_callback, authentik_login])
         .attach(Template::fairing())
+        .attach(AdHoc::on_ignite("OAuth Config", |mut rocket| async {
+            let provider = StaticProvider {
+                auth_uri: dotenv::var("OAUTH2_AUTH_URI")
+                    .expect("Cannot get OAuth2 Auth URI")
+                    .into(),
+                token_uri: dotenv::var("OAUTH2_TOKEN_URI")
+                    .expect("Cannot get OAuth2 Token URI")
+                    .into(),
+            };
+            let client_id = dotenv::var("OAUTH2_CLIENT_ID").expect("Cannot get OAuth2 Client ID");
+            let client_secret =
+                dotenv::var("OAUTH2_CLIENT_SECRET").expect("Cannot get OAuth2 Client Secret");
+            let redirect_uri = Some(dotenv::var("OAUTH2_REDIRECT_URI")
+                .expect("Cannot get OAuth2 Redirect URI")
+                .to_string());
+
+            let config = OAuthConfig::new(provider, client_id, client_secret, redirect_uri);
+
+            rocket.attach(OAuth2::<Authentik>::custom(
+                HyperRustlsAdapter::default(),
+                config,
+            ))
+        }))
 }
